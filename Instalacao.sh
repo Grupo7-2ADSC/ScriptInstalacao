@@ -1,103 +1,100 @@
 #!/bin/bash
 
-echo "Olá! Seja bem-vindo(a) ao ambiente de instalação da Sentinel System, vou te auxiliar no processo de instalação."
-sleep 2
+# Função para exibir a barra de progresso
+progress_bar() { 
+    local duration=$1 
+    already_done() { for ((done=0; done<$elapsed; done++)); do printf "▇"; done } 
+    remaining() { for ((remain=$elapsed; remain<$duration; remain++)); do printf " "; done } 
+    percentage() { printf "| %s%%" $(( (($elapsed)*100)/($duration)*100/100 )); } 
+    clean_line() { printf "\r"; } 
+    for ((elapsed=1; elapsed<=$duration; elapsed++)) 
+    do 
+        already_done; remaining; percentage 
+        sleep 1 
+        clean_line 
+    done 
+    printf "\n"
+}
+
+echo "Olá! Seja bem-vindo(a) ao ambiente de instalação da Sentinel System. Vou te auxiliar no processo de instalação."
+sleep 3
+
 echo "Podemos iniciar o processo de instalação? [s/n]"
 read confirmation
-if [ "$confirmation" = "S" ] || [ "$confirmation" = "s" ]; 
-then
+if [[ "$confirmation" =~ ^[Ss]$ ]]; then
     echo "Iniciando instalação"
     sleep 3
-    sudo apt upgrade && sudo apt update -y
+    sudo apt update -y && sudo apt upgrade -y
+
     echo "Primeira etapa concluída. Agora precisamos verificar se você possui o Java instalado"
     sleep 3
     java --version
-    if [ $? = 0 ]; 
-then
-	echo "       "
+    if [ $? -eq 0 ]; then
         echo "Você já possui o Java instalado!"
     else
         echo "Verificamos que você não possui o Java instalado."
         sleep 2
-	echo "    "
         echo "Gostaria de instalar o Java? [s/n]"
         read get_java
-        if [ "$get_java" == "s" ]; 
-then
-            sudo apt install openjdk-17-jre -y
-	    echo "   "
+        if [[ "$get_java" =~ ^[Ss]$ ]]; then
+            sudo apt install -y openjdk-17-jre
+            (progress_bar 10) & 
+            pid=$!
+            wait $pid
             echo "Java instalado com sucesso!"
             sleep 3
         fi
     fi
-	echo "    "
-    echo "O próximo passo é verificar o mySQL em sua máquina"
-    sleep 3
-    mysql --version
-    if [ $? = 0 ]; 
-then
-	echo "         "
-        echo "Você já possui o MySQL!
 
-"
-    else
-	echo "      "
-        echo "Percebemos que você ainda não tem o MySQL instalado"
-        sleep 2
-	echo "       "
-        echo "Gostaria de instalar o MySQL? [s/n]"
-        read get_mysql
-        if [ "$get_mysql" == "s" ]; 
-then
-            sudo apt install mysql-server -y
-	    echo "   "
-            echo "MySQL instalado com sucesso!"
-        else
-	    echo "      "
-            echo "O MySQL não será instalado, isso pode acarretar eventual erro"
-        fi
-    fi
-	echo "     "
-    echo "O último passo é verificarmos se você possui o GIT instalado. O GIT é o sistema que utilizamos para manter nossa aplicação atualizada e acrescentarmos novas features."
-    sleep 3
+    echo "Agora precisamos fazer a instalação do Docker e a criação de containers. Essas ferramentas vão garantir que nosso sistema funcione adequadamente e com um melhor desempenho."
+    sleep 4
+    echo "Podemos iniciar? [s/n]"
+    read get
+    if [[ "$get" =~ ^[Ss]$ ]]; then 
+        sudo apt install -y docker.io
+        (progress_bar 10) & 
+        pid=$!
+        wait $pid
+                
+        echo "Docker já instalado, agora iremos iniciá-lo"
+        sudo systemctl start docker
+        sudo systemctl enable docker
+        sleep 3
+        (progress_bar 10) & 
+        pid=$!
+        wait $pid
 
-    git --version
-    if [ $? = 0 ]; 
-then
-        if [ -d "Jar" ]; 
-then
-		echo "     "
-            echo "Você já possui o GIT e nossa aplicação!"
-            sleep 3
-		echo "    "
-            cd "Jar" && git pull && cd ..
-            echo "Aplicação atualizada e pronta para uso"
-sleep 3
-        else
-		echo "      "
-            echo "Você possui o GIT mas precisamos instalar nossa aplicação, aguarde um instante"
-            sleep 3
-            git clone https://github.com/Grupo7-2ADSC/Jar-Gp7.git
-        fi
+        echo "Docker iniciado!"
+        sleep 4
+
+        echo "Agora que já temos nosso ambiente Docker, vamos criar um contêiner para rodar o Git."
+        sleep 3
+
+        sudo docker run -it --name git-container ubuntu:latest bash -c "apt update && apt install -y git && git clone https://github.com/Grupo7-2ADSC/Jar-Gp7.git"
+        (progress_bar 5) & 
+        pid=$!
+        wait $pid
+
+        echo "Clonagem do repositório concluída com sucesso"
+        sleep 3
+
+        echo "Nosso próximo passo é instalar um banco de dados. Isso permite que possamos armazenar os dados capturados, criar gráficos dinâmicos e gerar relatórios"
+        sleep 4
+
+        sudo docker run -d -p 3306:3306 --name ContainerBD -e "MYSQL_DATABASE=sentinel_system" -e "MYSQL_ROOT_PASSWORD=@Thigas844246" mysql:5.7
+        echo "Esperando o contêiner inicializar..."
+        sleep 30 # Ajuste conforme necessário para garantir que o MySQL esteja pronto
+
+        echo "Excelente!! Os containers e Docker já foram criados e a conexão com o banco está pronta."
+        sleep 4
+        echo "Instalação finalizada! Pressione Enter para sair."
+        read
     else
-	echo "        "
-        echo "Você não possui o GIT instalado, deseja instalar agora? [s/n]"
-        read get
-        if [ "$get" = "S" ] || [ "$get" = "s" ]; 
-then
-            sudo apt install git
-            git clone https://github.com/Grupo7-2ADSC/Jar-Gp7.git
-		echo "       "
-            echo "Instalação concluída com sucesso"
-            sleep 3
-        else
-		echo "     "
-            echo "Que pena! Estaremos aguardando caso mude de ideia"
-            sleep 3
-        fi
+        echo "Infelizmente você não quis prosseguir e isso pode gerar falhas na execução do sistema. Caso mude de ideia, estamos prontos para continuar a instalação."
+        sleep 4
     fi
+else
+    echo "Instalação abortada pelo usuário."
+    sleep 2
 fi
 
-echo "      "
-echo "Instalação finalizada! Pressione Enter para sair."
-read
